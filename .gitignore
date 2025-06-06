@@ -7,105 +7,95 @@ local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local char = player.Character or player.CharacterAdded:Wait()
-local hrp = char:WaitForChild("HumanoidRootPart")
+local IGHAE_GUI = player:WaitForChild("PlayerGui"):FindFirstChild("IGHAE_Hub")
 
-local IGHAE_GUI = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-IGHAE_GUI.Name = "IGHAE_Hub"
+if not IGHAE_GUI then
+	IGHAE_GUI = Instance.new("ScreenGui", player.PlayerGui)
+	IGHAE_GUI.Name = "IGHAE_Hub"
 
-local Frame = Instance.new("Frame", IGHAE_GUI)
-Frame.Size = UDim2.new(0, 300, 0, 240)
-Frame.Position = UDim2.new(0.3, 0, 0.3, 0)
-Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-Frame.Active = true
-Frame.Draggable = true
+	local Frame = Instance.new("Frame", IGHAE_GUI)
+	Frame.Size = UDim2.new(0, 300, 0, 240)
+	Frame.Position = UDim2.new(0.3, 0, 0.3, 0)
+	Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	Frame.Active = true
+	Frame.Draggable = true
 
-local Title = Instance.new("TextLabel", Frame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "FIXHG"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-Title.Font = Enum.Font.GothamBold
-Title.TextSize = 20
+	local Title = Instance.new("TextLabel", Frame)
+	Title.Size = UDim2.new(1, 0, 0, 40)
+	Title.Text = "FIXHG"
+	Title.TextColor3 = Color3.new(1, 1, 1)
+	Title.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+	Title.Font = Enum.Font.GothamBold
+	Title.TextSize = 20
 
-local function createToggle(name, posY, stateCallback)
-	local btn = Instance.new("TextButton", Frame)
-	btn.Size = UDim2.new(0.8, 0, 0, 30)
-	btn.Position = UDim2.new(0.1, 0, 0, posY)
-	btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-	btn.TextColor3 = Color3.new(1, 1, 1)
-	btn.Font = Enum.Font.Gotham
-	btn.TextSize = 14
+	function createToggle(name, posY, callback)
+		local btn = Instance.new("TextButton", Frame)
+		btn.Size = UDim2.new(0.8, 0, 0, 30)
+		btn.Position = UDim2.new(0.1, 0, 0, posY)
+		btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+		btn.TextColor3 = Color3.new(1, 1, 1)
+		btn.Font = Enum.Font.Gotham
+		btn.TextSize = 14
 
-	local toggled = false
-	btn.Text = "[ OFF ] " .. name
+		local toggled = false
+		btn.Text = "[ OFF ] " .. name
 
-	btn.MouseButton1Click:Connect(function()
-		toggled = not toggled
-		btn.Text = (toggled and "[ ON  ] " or "[ OFF ] ") .. name
-		stateCallback(toggled)
-	end)
+		btn.MouseButton1Click:Connect(function()
+			toggled = not toggled
+			btn.Text = (toggled and "[ ON  ] " or "[ OFF ] ") .. name
+			callback(toggled)
+		end)
+	end
 end
 
-local flyEnabled = false
-local flySpeed = 60
-local flyVelocity
+-- Toggles
+local flyEnabled, jumpEnabled, espEnabled, flingEnabled = false, false, false, false
+local flyVelocity, jumpConn1, jumpConn2, jumping = nil, nil, nil, false
+
+-- Functions (now reuse updated character)
+local function setupFly(hrp)
+	if flyEnabled then
+		flyVelocity = Instance.new("BodyVelocity")
+		flyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+		flyVelocity.Parent = hrp
+	end
+end
 
 local function updateFly(toggle)
 	flyEnabled = toggle
 	if toggle then
-		flyVelocity = Instance.new("BodyVelocity")
-		flyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-		flyVelocity.Parent = hrp
+		local hrp = player.Character:WaitForChild("HumanoidRootPart")
+		setupFly(hrp)
 
 		RunService:BindToRenderStep("IGHAEFly", Enum.RenderPriority.Input.Value, function()
-			if not flyEnabled then return end
+			if not flyEnabled or not flyVelocity or not player.Character then return end
 			local cam = workspace.CurrentCamera
 			local moveVec = Vector3.zero
 
-			if UIS:IsKeyDown(Enum.KeyCode.W) then
-				moveVec += cam.CFrame.LookVector
-			end
-			if UIS:IsKeyDown(Enum.KeyCode.S) then
-				moveVec -= cam.CFrame.LookVector
-			end
-			if UIS:IsKeyDown(Enum.KeyCode.A) then
-				moveVec -= cam.CFrame.RightVector
-			end
-			if UIS:IsKeyDown(Enum.KeyCode.D) then
-				moveVec += cam.CFrame.RightVector
-			end
+			if UIS:IsKeyDown(Enum.KeyCode.W) then moveVec += cam.CFrame.LookVector end
+			if UIS:IsKeyDown(Enum.KeyCode.S) then moveVec -= cam.CFrame.LookVector end
+			if UIS:IsKeyDown(Enum.KeyCode.A) then moveVec -= cam.CFrame.RightVector end
+			if UIS:IsKeyDown(Enum.KeyCode.D) then moveVec += cam.CFrame.RightVector end
 
-			if moveVec.Magnitude > 0 then
-				flyVelocity.Velocity = moveVec.Unit * flySpeed
-			else
-				flyVelocity.Velocity = Vector3.zero
-			end
+			flyVelocity.Velocity = (moveVec.Magnitude > 0) and moveVec.Unit * 60 or Vector3.zero
 		end)
 	else
-		if flyVelocity then
-			flyVelocity:Destroy()
-			flyVelocity = nil
-		end
+		if flyVelocity then flyVelocity:Destroy() flyVelocity = nil end
 		RunService:UnbindFromRenderStep("IGHAEFly")
 	end
 end
 
-local jumpConn1, jumpConn2
-local jumping = false
-
 local function updateInfJump(toggle)
+	jumpEnabled = toggle
 	if toggle then
-		jumpConn1 = UIS.InputBegan:Connect(function(input, gameProcessed)
-			if input.KeyCode == Enum.KeyCode.Space and not gameProcessed and not jumping then
+		jumpConn1 = UIS.InputBegan:Connect(function(input, gpe)
+			if input.KeyCode == Enum.KeyCode.Space and not gpe and not jumping then
 				jumping = true
-				char:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+				player.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
 			end
 		end)
 		jumpConn2 = UIS.InputEnded:Connect(function(input)
-			if input.KeyCode == Enum.KeyCode.Space then
-				jumping = false
-			end
+			if input.KeyCode == Enum.KeyCode.Space then jumping = false end
 		end)
 	else
 		if jumpConn1 then jumpConn1:Disconnect() end
@@ -114,38 +104,24 @@ local function updateInfJump(toggle)
 	end
 end
 
-local function updateFling(toggle)
-	if toggle then
-		local body = Instance.new("BodyAngularVelocity", hrp)
-		body.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-		body.AngularVelocity = Vector3.new(0, 100, 0)
-		body.Name = "IGHAEFling"
-	else
-		local existing = hrp:FindFirstChild("IGHAEFling")
-		if existing then existing:Destroy() end
-	end
-end
-
 local function updateESP(toggle)
+	espEnabled = toggle
 	for _, p in pairs(Players:GetPlayers()) do
 		if p ~= player and p.Character and p.Character:FindFirstChild("Head") then
-			if toggle then
-				if not p.Character.Head:FindFirstChild("IGHAE_ESP") then
-					local billboard = Instance.new("BillboardGui", p.Character.Head)
-					billboard.Name = "IGHAE_ESP"
-					billboard.Size = UDim2.new(0, 100, 0, 40)
-					billboard.Adornee = p.Character.Head
-					billboard.AlwaysOnTop = true
-
-					local label = Instance.new("TextLabel", billboard)
-					label.Size = UDim2.new(1, 0, 1, 0)
-					label.Text = p.Name
-					label.BackgroundTransparency = 1
-					label.TextColor3 = Color3.new(1, 0, 0)
-					label.Font = Enum.Font.GothamBold
-					label.TextScaled = true
-				end
-			else
+			if toggle and not p.Character.Head:FindFirstChild("IGHAE_ESP") then
+				local bb = Instance.new("BillboardGui", p.Character.Head)
+				bb.Name = "IGHAE_ESP"
+				bb.Size = UDim2.new(0, 100, 0, 40)
+				bb.Adornee = p.Character.Head
+				bb.AlwaysOnTop = true
+				local lbl = Instance.new("TextLabel", bb)
+				lbl.Size = UDim2.new(1, 0, 1, 0)
+				lbl.Text = p.Name
+				lbl.BackgroundTransparency = 1
+				lbl.TextColor3 = Color3.new(1, 0, 0)
+				lbl.Font = Enum.Font.GothamBold
+				lbl.TextScaled = true
+			elseif not toggle then
 				local existing = p.Character.Head:FindFirstChild("IGHAE_ESP")
 				if existing then existing:Destroy() end
 			end
@@ -153,8 +129,34 @@ local function updateESP(toggle)
 	end
 end
 
-createToggle("Fly", 50, updateFly)
-createToggle("Infinite Jump", 90, updateInfJump)
-createToggle("ESP", 130, updateESP)
-createToggle("Fling", 170, updateFling)
-IGHAE_GUI.ResetOnSpawn = false
+local function updateFling(toggle)
+	flingEnabled = toggle
+	local hrp = player.Character:WaitForChild("HumanoidRootPart")
+	if toggle then
+		local b = Instance.new("BodyAngularVelocity", hrp)
+		b.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+		b.AngularVelocity = Vector3.new(0, 100, 0)
+		b.Name = "IGHAEFling"
+	else
+		local e = hrp:FindFirstChild("IGHAEFling")
+		if e then e:Destroy() end
+	end
+end
+
+-- Character reset handler
+local function onCharacterAdded(char)
+	local hrp = char:WaitForChild("HumanoidRootPart")
+	if flyEnabled then setupFly(hrp) end
+	if flingEnabled then updateFling(true) end
+end
+
+-- Reapply features on respawn
+player.CharacterAdded:Connect(onCharacterAdded)
+
+-- First-time setup
+if not IGHAE_GUI:FindFirstChildWhichIsA("Frame") then
+	createToggle("Fly", 50, updateFly)
+	createToggle("Infinite Jump", 90, updateInfJump)
+	createToggle("ESP", 130, updateESP)
+	createToggle("Fling", 170, updateFling)
+end
