@@ -75,12 +75,6 @@ local function updateFly(toggle)
 			if UIS:IsKeyDown(Enum.KeyCode.D) then
 				moveVec += cam.CFrame.RightVector
 			end
-			if UIS:IsKeyDown(Enum.KeyCode.Space) then
-				moveVec += cam.CFrame.UpVector
-			end
-			if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then
-				moveVec -= cam.CFrame.UpVector
-			end
 
 			if moveVec.Magnitude > 0 then
 				flyVelocity.Velocity = moveVec.Unit * flySpeed
