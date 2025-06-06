@@ -157,3 +157,4 @@ createToggle("Fly", 50, updateFly)
 createToggle("Infinite Jump", 90, updateInfJump)
 createToggle("ESP", 130, updateESP)
 createToggle("Fling", 170, updateFling)
+IGHAE_GUI.ResetOnSpawn = false
