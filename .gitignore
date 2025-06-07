@@ -8,317 +8,279 @@ local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
--- Wait for LocalPlayer if in Studio and it's nil (Play Solo mode)
-if not player then
-    Players:GetPropertyChangedSignal("LocalPlayer"):Wait()
-    player = Players.LocalPlayer
-end
-
 local KEY_CODE = "free_296"
+local unlocked = false  -- remembers if the key is accepted this session
 
-local flyEnabled = false
-local infJumpEnabled = false
-local espEnabled = false
-local flingEnabled = false
-
-local jumpConn1, jumpConn2
-local flyingConn
-
--- Destroy old GUI if exists
+-- Utility to clean old FIXHG GUIs to avoid duplicates
 local function cleanGui()
-    local oldGui = player.PlayerGui:FindFirstChild("FIXHG_Hub")
-    if oldGui then oldGui:Destroy() end
-    local oldKeyGui = player.PlayerGui:FindFirstChild("FIXHG_KeySystem")
-    if oldKeyGui then oldKeyGui:Destroy() end
+	local oldGui = player:FindFirstChildOfClass("PlayerGui"):FindFirstChild("FIXHG_Hub")
+	if oldGui then oldGui:Destroy() end
+	local oldKeyGui = player:FindFirstChildOfClass("PlayerGui"):FindFirstChild("FIXHG_KeySystem")
+	if oldKeyGui then oldKeyGui:Destroy() end
 end
 
--- Main GUI creation
+-- Main Hub GUI creation
 local function createGui(char)
-    if not char then return end
-    local hrp = char:WaitForChild("HumanoidRootPart")
-    
-    cleanGui()
-    
-    local FIXHG_GUI = Instance.new("ScreenGui")
-    FIXHG_GUI.Name = "FIXHG_Hub"
-    FIXHG_GUI.ResetOnSpawn = false
-    FIXHG_GUI.Parent = player:WaitForChild("PlayerGui")
+	cleanGui()
 
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 320, 0, 260)
-    Frame.Position = UDim2.new(0.5, 0, 0.4, 0)
-    Frame.AnchorPoint = Vector2.new(0.5, 0.5)
-    Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    Frame.BorderSizePixel = 0
-    Frame.Active = true
-    Frame.Draggable = true
-    Frame.Parent = FIXHG_GUI
+	local hrp = char:WaitForChild("HumanoidRootPart")
 
-    local Shadow = Instance.new("Frame", Frame)
-    Shadow.Size = UDim2.new(1, 10, 1, 10)
-    Shadow.Position = UDim2.new(0, -5, 0, -5)
-    Shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    Shadow.BorderSizePixel = 0
-    Shadow.ZIndex = 0
-    Shadow.BackgroundTransparency = 0.7
-    Shadow.ClipsDescendants = true
+	local FIXHG_GUI = Instance.new("ScreenGui")
+	FIXHG_GUI.Name = "FIXHG_Hub"
+	FIXHG_GUI.ResetOnSpawn = false
+	FIXHG_GUI.Parent = player:WaitForChild("PlayerGui")
 
-    local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, 0, 0, 40)
-    Title.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
-    Title.BorderSizePixel = 0
-    Title.Text = "FIXHG Hub"
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 22
-    Title.TextColor3 = Color3.fromRGB(200, 200, 255)
-    Title.Parent = Frame
+	local Frame = Instance.new("Frame")
+	Frame.Size = UDim2.new(0, 350, 0, 270)
+	Frame.Position = UDim2.new(0.5, 0, 0.35, 0)
+	Frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 40)
+	Frame.BorderSizePixel = 0
+	Frame.Active = true
+	Frame.Draggable = true
+	Frame.Parent = FIXHG_GUI
 
-    -- Utility function for toggle buttons
-    local function createToggle(name, posY, initialState, callback)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0.8, 0, 0, 35)
-        btn.Position = UDim2.new(0.1, 0, 0, posY)
-        btn.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-        btn.BorderSizePixel = 0
-        btn.AutoButtonColor = false
-        btn.Font = Enum.Font.GothamSemibold
-        btn.TextSize = 16
-        btn.TextColor3 = Color3.new(1, 1, 1)
-        btn.Text = (initialState and "[ ON  ] " or "[ OFF ] ") .. name
-        btn.Parent = Frame
+	local Title = Instance.new("TextLabel")
+	Title.Size = UDim2.new(1, 0, 0, 45)
+	Title.BackgroundColor3 = Color3.fromRGB(15, 15, 30)
+	Title.BorderSizePixel = 0
+	Title.Text = "FIXHG Hub"
+	Title.Font = Enum.Font.GothamBold
+	Title.TextSize = 24
+	Title.TextColor3 = Color3.fromRGB(200, 200, 255)
+	Title.Parent = Frame
 
-        btn.MouseEnter:Connect(function()
-            btn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
-        end)
-        btn.MouseLeave:Connect(function()
-            btn.BackgroundColor3 = Color3.fromRGB(45, 45, 65)
-        end)
+	-- Helper: create toggle buttons
+	local function createToggle(name, posY, initState, stateCallback)
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.new(0.8, 0, 0, 35)
+		btn.Position = UDim2.new(0.1, 0, 0, posY)
+		btn.BackgroundColor3 = Color3.fromRGB(60, 60, 90)
+		btn.TextColor3 = Color3.new(1, 1, 1)
+		btn.Font = Enum.Font.Gotham
+		btn.TextSize = 16
+		btn.Text = (initState and "[ ON  ] " or "[ OFF ] ") .. name
+		btn.Parent = Frame
 
-        local toggled = initialState
+		local toggled = initState or false
 
-        btn.MouseButton1Click:Connect(function()
-            toggled = not toggled
-            btn.Text = (toggled and "[ ON  ] " or "[ OFF ] ") .. name
-            callback(toggled)
-        end)
-        return btn
-    end
+		btn.MouseButton1Click:Connect(function()
+			toggled = not toggled
+			btn.Text = (toggled and "[ ON  ] " or "[ OFF ] ") .. name
+			stateCallback(toggled)
+		end)
+	end
 
-    -- Fly Logic
-    local flyVelocity
-    local function updateFly(toggle)
-        flyEnabled = toggle
-        if toggle then
-            if not flyVelocity then
-                flyVelocity = Instance.new("BodyVelocity")
-                flyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-                flyVelocity.Velocity = Vector3.new(0,0,0)
-                flyVelocity.Parent = hrp
-            end
+	-- Fly feature
+	local flyEnabled = false
+	local flySpeed = 60
+	local flyVelocity
 
-            flyingConn = RunService:BindToRenderStep("FIXHG_Fly", Enum.RenderPriority.Input.Value, function()
-                if not flyEnabled then return end
-                local cam = workspace.CurrentCamera
-                local moveVec = Vector3.new(0, 0, 0)
-                if UIS:IsKeyDown(Enum.KeyCode.W) then
-                    moveVec = moveVec + cam.CFrame.LookVector
-                end
-                if UIS:IsKeyDown(Enum.KeyCode.S) then
-                    moveVec = moveVec - cam.CFrame.LookVector
-                end
-                if UIS:IsKeyDown(Enum.KeyCode.A) then
-                    moveVec = moveVec - cam.CFrame.RightVector
-                end
-                if UIS:IsKeyDown(Enum.KeyCode.D) then
-                    moveVec = moveVec + cam.CFrame.RightVector
-                end
-                if moveVec.Magnitude > 0 then
-                    flyVelocity.Velocity = moveVec.Unit * 60
-                else
-                    flyVelocity.Velocity = Vector3.new(0, 0, 0)
-                end
-            end)
-        else
-            if flyVelocity then
-                flyVelocity:Destroy()
-                flyVelocity = nil
-            end
-            if flyingConn then
-                RunService:UnbindFromRenderStep("FIXHG_Fly")
-                flyingConn = nil
-            end
-        end
-    end
+	local function updateFly(toggle)
+		flyEnabled = toggle
+		if toggle then
+			flyVelocity = Instance.new("BodyVelocity")
+			flyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+			flyVelocity.Parent = hrp
 
-    -- Infinite Jump Logic
-    local jumping = false
-    if jumpConn1 then jumpConn1:Disconnect() jumpConn1 = nil end
-    if jumpConn2 then jumpConn2:Disconnect() jumpConn2 = nil end
+			RunService:BindToRenderStep("FIXHGFly", Enum.RenderPriority.Input.Value, function()
+				if not flyEnabled then return end
+				local cam = workspace.CurrentCamera
+				local moveVec = Vector3.zero
 
-    local function updateInfJump(toggle)
-        infJumpEnabled = toggle
-        if toggle then
-            jumpConn1 = UIS.InputBegan:Connect(function(input, gameProcessed)
-                if input.KeyCode == Enum.KeyCode.Space and not gameProcessed and not jumping then
-                    jumping = true
-                    local humanoid = char:FindFirstChildOfClass("Humanoid")
-                    if humanoid then
-                        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-                    end
-                end
-            end)
-            jumpConn2 = UIS.InputEnded:Connect(function(input)
-                if input.KeyCode == Enum.KeyCode.Space then
-                    jumping = false
-                end
-            end)
-        else
-            if jumpConn1 then jumpConn1:Disconnect() jumpConn1 = nil end
-            if jumpConn2 then jumpConn2:Disconnect() jumpConn2 = nil end
-            jumping = false
-        end
-    end
+				if UIS:IsKeyDown(Enum.KeyCode.W) then
+					moveVec += cam.CFrame.LookVector
+				end
+				if UIS:IsKeyDown(Enum.KeyCode.S) then
+					moveVec -= cam.CFrame.LookVector
+				end
+				if UIS:IsKeyDown(Enum.KeyCode.A) then
+					moveVec -= cam.CFrame.RightVector
+				end
+				if UIS:IsKeyDown(Enum.KeyCode.D) then
+					moveVec += cam.CFrame.RightVector
+				end
 
-    -- Fling Logic
-    local function updateFling(toggle)
-        flingEnabled = toggle
-        if toggle then
-            if not hrp:FindFirstChild("FIXHG_Fling") then
-                local body = Instance.new("BodyAngularVelocity")
-                body.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-                body.AngularVelocity = Vector3.new(0, 100, 0)
-                body.Name = "FIXHG_Fling"
-                body.Parent = hrp
-            end
-        else
-            local existing = hrp:FindFirstChild("FIXHG_Fling")
-            if existing then existing:Destroy() end
-        end
-    end
+				if moveVec.Magnitude > 0 then
+					flyVelocity.Velocity = moveVec.Unit * flySpeed
+				else
+					flyVelocity.Velocity = Vector3.zero
+				end
+			end)
+		else
+			if flyVelocity then
+				flyVelocity:Destroy()
+				flyVelocity = nil
+			end
+			RunService:UnbindFromRenderStep("FIXHGFly")
+		end
+	end
 
-    -- ESP Logic
-    local function updateESP(toggle)
-        espEnabled = toggle
-        for _, p in pairs(Players:GetPlayers()) do
-            if p ~= player and p.Character and p.Character:FindFirstChild("Head") then
-                local head = p.Character.Head
-                if toggle then
-                    if not head:FindFirstChild("FIXHG_ESP") then
-                        local billboard = Instance.new("BillboardGui")
-                        billboard.Name = "FIXHG_ESP"
-                        billboard.Adornee = head
-                        billboard.Size = UDim2.new(0, 100, 0, 40)
-                        billboard.AlwaysOnTop = true
-                        billboard.Parent = head
+	-- Infinite Jump feature
+	local jumpConn1, jumpConn2
+	local jumping = false
 
-                        local label = Instance.new("TextLabel")
-                        label.Size = UDim2.new(1, 0, 1, 0)
-                        label.BackgroundTransparency = 1
-                        label.TextColor3 = Color3.new(1, 0, 0)
-                        label.Font = Enum.Font.GothamBold
-                        label.TextScaled = true
-                        label.Text = p.Name
-                        label.Parent = billboard
-                    end
-                else
-                    local existing = head:FindFirstChild("FIXHG_ESP")
-                    if existing then existing:Destroy() end
-                end
-            end
-        end
-    end
+	local function updateInfJump(toggle)
+		if toggle then
+			jumpConn1 = UIS.InputBegan:Connect(function(input, gameProcessed)
+				if input.KeyCode == Enum.KeyCode.Space and not gameProcessed and not jumping then
+					jumping = true
+					local humanoid = char:FindFirstChildOfClass("Humanoid")
+					if humanoid then
+						humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+					end
+				end
+			end)
+			jumpConn2 = UIS.InputEnded:Connect(function(input)
+				if input.KeyCode == Enum.KeyCode.Space then
+					jumping = false
+				end
+			end)
+		else
+			if jumpConn1 then jumpConn1:Disconnect() end
+			if jumpConn2 then jumpConn2:Disconnect() end
+			jumping = false
+		end
+	end
 
-    createToggle("Fly", 60, flyEnabled, updateFly)
-    createToggle("Infinite Jump", 110, infJumpEnabled, updateInfJump)
-    createToggle("ESP", 160, espEnabled, updateESP)
-    createToggle("Fling", 210, flingEnabled, updateFling)
+	-- Fling feature
+	local function updateFling(toggle)
+		if toggle then
+			local body = Instance.new("BodyAngularVelocity")
+			body.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+			body.AngularVelocity = Vector3.new(0, 100, 0)
+			body.Name = "FIXHGFling"
+			body.Parent = hrp
+		else
+			local existing = hrp:FindFirstChild("FIXHGFling")
+			if existing then existing:Destroy() end
+		end
+	end
+
+	-- ESP feature
+	local function updateESP(toggle)
+		for _, p in pairs(Players:GetPlayers()) do
+			if p ~= player and p.Character and p.Character:FindFirstChild("Head") then
+				if toggle then
+					if not p.Character.Head:FindFirstChild("FIXHG_ESP") then
+						local billboard = Instance.new("BillboardGui")
+						billboard.Name = "FIXHG_ESP"
+						billboard.Size = UDim2.new(0, 100, 0, 40)
+						billboard.Adornee = p.Character.Head
+						billboard.AlwaysOnTop = true
+						billboard.Parent = p.Character.Head
+
+						local label = Instance.new("TextLabel")
+						label.Size = UDim2.new(1, 0, 1, 0)
+						label.Text = p.Name
+						label.BackgroundTransparency = 1
+						label.TextColor3 = Color3.new(1, 0, 0)
+						label.Font = Enum.Font.GothamBold
+						label.TextScaled = true
+						label.Parent = billboard
+					end
+				else
+					local existing = p.Character.Head:FindFirstChild("FIXHG_ESP")
+					if existing then existing:Destroy() end
+				end
+			end
+		end
+	end
+
+	createToggle("Fly", 60, flyEnabled, updateFly)
+	createToggle("Infinite Jump", 110, false, updateInfJump)
+	createToggle("ESP", 160, false, updateESP)
+	createToggle("Fling", 210, false, updateFling)
 end
 
 -- Key System GUI
 local function createKeyGui()
-    cleanGui()
-    
-    local KeyGui = Instance.new("ScreenGui")
-    KeyGui.Name = "FIXHG_KeySystem"
-    KeyGui.ResetOnSpawn = false
-    KeyGui.Parent = player:WaitForChild("PlayerGui")
+	cleanGui()
 
-    local Frame = Instance.new("Frame")
-    Frame.Size = UDim2.new(0, 350, 0, 150)
-    Frame.Position = UDim2.new(0.5, 0, 0.4, 0)
-    Frame.AnchorPoint = Vector2.new(0.5, 0.5)
-    Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
-    Frame.BorderSizePixel = 0
-    Frame.Active = true
-    Frame.Draggable = true
-    Frame.Parent = KeyGui
+	local KeyGui = Instance.new("ScreenGui")
+	KeyGui.Name = "FIXHG_KeySystem"
+	KeyGui.ResetOnSpawn = false
+	KeyGui.Parent = player:WaitForChild("PlayerGui")
 
-    local Title = Instance.new("TextLabel")
-    Title.Size = UDim2.new(1, 0, 0, 45)
-    Title.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
-    Title.BorderSizePixel = 0
-    Title.Text = "Enter Key to Access FIXHG Hub"
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 22
-    Title.TextColor3 = Color3.fromRGB(180, 180, 255)
-    Title.Parent = Frame
+	local Frame = Instance.new("Frame")
+	Frame.Size = UDim2.new(0, 350, 0, 150)
+	Frame.Position = UDim2.new(0.5, 0, 0.4, 0)
+	Frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+	Frame.BorderSizePixel = 0
+	Frame.Active = true
+	Frame.Draggable = true
+	Frame.Parent = KeyGui
 
-    local TextBox = Instance.new("TextBox")
-    TextBox.Size = UDim2.new(0.8, 0, 0, 40)
-    TextBox.Position = UDim2.new(0.1, 0, 0, 60)
-    TextBox.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-    TextBox.BorderSizePixel = 0
-    TextBox.PlaceholderText = "Example: free_123"
-    TextBox.Font = Enum.Font.Gotham
-    TextBox.TextSize = 20
-    TextBox.TextColor3 = Color3.fromRGB(230, 230, 255)
-    TextBox.ClearTextOnFocus = false
-    TextBox.Text = ""
+	local Title = Instance.new("TextLabel")
+	Title.Size = UDim2.new(1, 0, 0, 45)
+	Title.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+	Title.BorderSizePixel = 0
+	Title.Text = "Enter Key to Access FIXHG Hub"
+	Title.Font = Enum.Font.GothamBold
+	Title.TextSize = 22
+	Title.TextColor3 = Color3.fromRGB(180, 180, 255)
+	Title.Parent = Frame
 
-    TextBox.Parent = Frame
+	local TextBox = Instance.new("TextBox")
+	TextBox.Size = UDim2.new(0.8, 0, 0, 40)
+	TextBox.Position = UDim2.new(0.1, 0, 0, 60)
+	TextBox.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+	TextBox.BorderSizePixel = 0
+	TextBox.PlaceholderText = "Example: free_123"
+	TextBox.Font = Enum.Font.Gotham
+	TextBox.TextSize = 20
+	TextBox.TextColor3 = Color3.fromRGB(230, 230, 255)
+	TextBox.ClearTextOnFocus = false
+	TextBox.Text = ""
 
-    local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(1, 0, 0, 30)
-    StatusLabel.Position = UDim2.new(0, 0, 0, 110)
-    StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Text = ""
-    StatusLabel.Font = Enum.Font.Gotham
-    StatusLabel.TextSize = 18
-    StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-    StatusLabel.Parent = Frame
+	TextBox.Parent = Frame
 
-    local function checkKey(key)
-        if key:lower() == KEY_CODE then
-            StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-            StatusLabel.Text = "Key accepted! Loading hub..."
-            wait(1)
-            KeyGui:Destroy()
-            if player.Character then
-                createGui(player.Character)
-            end
-        else
-            StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-            StatusLabel.Text = "Invalid key! Try again."
-        end
-    end
+	local StatusLabel = Instance.new("TextLabel")
+	StatusLabel.Size = UDim2.new(1, 0, 0, 30)
+	StatusLabel.Position = UDim2.new(0, 0, 0, 110)
+	StatusLabel.BackgroundTransparency = 1
+	StatusLabel.Text = ""
+	StatusLabel.Font = Enum.Font.Gotham
+	StatusLabel.TextSize = 18
+	StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+	StatusLabel.Parent = Frame
 
-    -- Check key on Enter pressed
-    TextBox.FocusLost:Connect(function(enterPressed)
-        if enterPressed then
-            local keyInput = TextBox.Text
-            checkKey(keyInput)
-        end
-    end)
+	local function checkKey(key)
+		if key:lower() == KEY_CODE then
+			unlocked = true
+			StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+			StatusLabel.Text = "Key accepted! Loading hub..."
+			wait(1)
+			KeyGui:Destroy()
+			if player.Character then
+				createGui(player.Character)
+			end
+		else
+			StatusLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+			StatusLabel.Text = "Invalid key! Try again."
+		end
+	end
+
+	TextBox.FocusLost:Connect(function(enterPressed)
+		if enterPressed then
+			local keyInput = TextBox.Text
+			checkKey(keyInput)
+		end
+	end)
 end
 
--- On character load, show key system first
+-- On character load, decide to show key system or hub
 local function onCharacterAdded(char)
-    wait(1)
-    createKeyGui()
+	wait(1)
+	if unlocked then
+		createGui(char)
+	else
+		createKeyGui()
+	end
 end
 
--- Start script
 if player.Character then
-    onCharacterAdded(player.Character)
+	onCharacterAdded(player.Character)
 end
 player.CharacterAdded:Connect(onCharacterAdded)
