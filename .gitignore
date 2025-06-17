@@ -1,6 +1,31 @@
-print("Loading may take 4 to 6 seconds...")
-task.wait(5)
-print("FIXHG Hub loaded!")
+-- Create "Naze Library" splash text
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Reference your main GUI
+local mainGui = playerGui:WaitForChild("YourMainGuiNameHere") -- CHANGE THIS to your GUI name
+mainGui.Enabled = false
+
+-- Create splash screen
+local splashGui = Instance.new("ScreenGui")
+splashGui.Name = "NazeSplash"
+splashGui.Parent = playerGui
+splashGui.ResetOnSpawn = false
+
+local splashText = Instance.new("TextLabel")
+splashText.Size = UDim2.new(1, 0, 1, 0)
+splashText.BackgroundTransparency = 1
+splashText.Text = "Naze Library"
+splashText.TextColor3 = Color3.new(1, 1, 1)
+splashText.TextStrokeTransparency = 0
+splashText.TextScaled = true
+splashText.Font = Enum.Font.GothamBold
+splashText.Parent = splashGui
+
+-- Wait and switch GUIs
+task.wait(3)  -- Wait 3 seconds
+splashGui:Destroy()
+mainGui.Enabled = true
 
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
